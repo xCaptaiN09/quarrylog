@@ -97,7 +97,8 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       stopMomentum()
-      el.scrollLeft += (e.deltaY + e.deltaX) * 2
+      const mult = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 200 : 1
+      el.scrollLeft += (e.deltaY + e.deltaX) * mult * 2
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -129,7 +130,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     s.moved = false
     s.vel = 0
 
-    const move = (ev: PointerEvent) => {
+    const move = (ev: MouseEvent) => {
       if (!s.down) return
       const total = ev.clientX - s.startX
       if (Math.abs(total) > 5) s.moved = true
@@ -144,9 +145,8 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     const up = () => {
       if (!s.down) return
       s.down = false
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
       if (Math.abs(s.vel) > 0.15) {
         let last = performance.now()
         const step = (now: number) => {
@@ -165,9 +165,8 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
       }
     }
 
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', up)
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
   }
 
   const onClickCapture = (e: ReactMouseEvent) => {
