@@ -163,11 +163,6 @@ export default function Today() {
     setTimeout(() => setFlash(''), 2500)
   }
 
-  const remove = async (id: string) => {
-    await supabase.from('trips').delete().eq('id', id)
-    await load()
-  }
-
   return (
     <div className="px-6 md:grid md:grid-cols-2 md:gap-x-12 md:px-0">
       <header className="flex items-baseline justify-between pt-8 md:col-span-2 md:pt-0">
@@ -385,9 +380,6 @@ export default function Today() {
                 <button onClick={() => setEditing(t)} className="hover:text-accent">
                   <Pencil size={14} strokeWidth={1.5} />
                 </button>
-                <button onClick={() => remove(t.id)} className="hover:text-accent">
-                  <X size={16} strokeWidth={1.5} />
-                </button>
               </span>
             </li>
           ))}
@@ -412,6 +404,10 @@ export default function Today() {
           trip={editing}
           onClose={() => setEditing(null)}
           onSaved={() => {
+            setEditing(null)
+            load()
+          }}
+          onDelete={() => {
             setEditing(null)
             load()
           }}

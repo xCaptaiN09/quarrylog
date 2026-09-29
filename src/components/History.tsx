@@ -81,40 +81,50 @@ export default function History() {
                   <ul className="mt-4 space-y-3">
                     {list.map((t) => (
                       <li key={t.id} className="border border-line p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="font-display text-xl tracking-tight">{t.plate_number}</span>
-                          <span className="flex items-center gap-3 text-sm text-muted">
-                            {fmtTime(t.trip_time)}
-                            <button onClick={() => setEditing(t)} className="hover:text-accent">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <span className="font-display text-xl tracking-tight">{t.plate_number}</span>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                              <span>{fmtTime(t.trip_time)}</span>
+                              {t.driver_phone && (
+                                <a
+                                  href={`tel:${t.driver_phone}`}
+                                  className="flex items-center gap-1 hover:text-accent"
+                                >
+                                  <Phone size={12} strokeWidth={1.5} /> {t.driver_phone}
+                                </a>
+                              )}
+                              {t.location_name && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin size={12} strokeWidth={1.5} /> {t.location_name}
+                                </span>
+                              )}
+                              {t.location_lat !== null && t.location_lng !== null && (
+                                <a
+                                  href={`https://www.google.com/maps?q=${t.location_lat},${t.location_lng}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="underline hover:text-accent"
+                                >
+                                  View map
+                                </a>
+                              )}
+                              {!t.driver_phone && !t.location_name && t.location_lat === null && (
+                                <span>No extra details</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            {t.image_url && (
+                              <a href={t.image_url} target="_blank" rel="noreferrer">
+                                <img src={t.image_url} alt="" className="h-20 w-20 object-cover" />
+                              </a>
+                            )}
+                            <button onClick={() => setEditing(t)} className="text-muted hover:text-accent">
                               <Pencil size={14} strokeWidth={1.5} />
                             </button>
-                          </span>
+                          </div>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-                          {t.driver_phone && (
-                            <a href={`tel:${t.driver_phone}`} className="flex items-center gap-1 hover:text-accent">
-                              <Phone size={12} strokeWidth={1.5} /> {t.driver_phone}
-                            </a>
-                          )}
-                          {t.location_lat !== null && t.location_lng !== null && (
-                            <a
-                              href={`https://www.google.com/maps?q=${t.location_lat},${t.location_lng}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-1 hover:text-accent"
-                            >
-                              <MapPin size={12} strokeWidth={1.5} /> {t.location_name || 'View map'}
-                            </a>
-                          )}
-                          {!t.driver_phone && !t.location_name && !t.location_lat && (
-                            <span>No extra details</span>
-                          )}
-                        </div>
-                        {t.image_url && (
-                          <a href={t.image_url} target="_blank" rel="noreferrer">
-                            <img src={t.image_url} alt="" className="mt-3 h-20 w-20 object-cover" />
-                          </a>
-                        )}
                       </li>
                     ))}
                   </ul>
@@ -130,6 +140,10 @@ export default function History() {
           trip={editing}
           onClose={() => setEditing(null)}
           onSaved={() => {
+            setEditing(null)
+            load()
+          }}
+          onDelete={() => {
             setEditing(null)
             load()
           }}

@@ -11,9 +11,10 @@ interface Props {
   trip: Trip
   onClose: () => void
   onSaved: () => void
+  onDelete: () => void
 }
 
-export default function TripEditor({ trip, onClose, onSaved }: Props) {
+export default function TripEditor({ trip, onClose, onSaved, onDelete }: Props) {
   const [plate, setPlate] = useState(trip.plate_number)
   const [phone, setPhone] = useState(trip.driver_phone ?? '')
   const [dt, setDt] = useState(`${trip.trip_date}T${fmtTime(trip.trip_time)}`)
@@ -27,6 +28,8 @@ export default function TripEditor({ trip, onClose, onSaved }: Props) {
   const [locating, setLocating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState('')
+  const [delText, setDelText] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const gps = () => {
     if (!navigator.geolocation) return
@@ -82,6 +85,14 @@ export default function TripEditor({ trip, onClose, onSaved }: Props) {
       return
     }
     onSaved()
+  }
+
+  const doDelete = async () => {
+    if (delText !== 'DELETE' || deleting) return
+    setDeleting(true)
+    await supabase.from('trips').delete().eq('id', trip.id)
+    setDeleting(false)
+    onDelete()
   }
 
   return (
@@ -141,7 +152,9 @@ export default function TripEditor({ trip, onClose, onSaved }: Props) {
             <MapIcon size={14} strokeWidth={1.5} /> Pin on map
           </button>
         </div>
-        {lat && lng && <p className="mt-2 text-xs text-muted">Coords: {lat.toFixed(5)}, {lng.toFixed(5)}</p>}
+        {lat !== null && lng !== null && (
+          <p className="mt-2 text-xs text-muted">Coords: {lat.toFixed(5)}, {lng.toFixed(5)}</p>
+        )}
 
         <label className="mt-5 block text-xs uppercase tracking-widest text-muted">Photo</label>
         <div className="mt-2 flex items-center gap-3">
@@ -159,7 +172,11 @@ export default function TripEditor({ trip, onClose, onSaved }: Props) {
           {imageUrl && (
             <button
               type="button"
-              onClick={() => { setImageUrl(null); setNewFile(null); setPreview(null) }}
+              onClick={() => {
+                setImageUrl(null)
+                setNewFile(null)
+                setPreview(null)
+              }}
               className="text-xs uppercase tracking-widest text-accent"
             >
               Remove
@@ -175,6 +192,27 @@ export default function TripEditor({ trip, onClose, onSaved }: Props) {
           {saving ? 'Saving' : 'Save changes'}
         </button>
         {flash && <p className="mt-3 text-sm text-accent">{flash}</p>}
+
+        <div className="mt-8 border-t border-line pt-5">
+          <label className="block text-xs uppercase tracking-widest text-muted">
+            Delete this load
+          </label>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={delText}
+              onChange={(e) => setDelText(e.target.value.toUpperCase())}
+              placeholder="Type DELETE"
+              className="flex-1 border border-line bg-transparent px-3 py-3 text-sm uppercase tracking-widest text-white outline-none placeholder:text-[#3A3A3A] focus:border-accent"
+            />
+            <button
+              onClick={doDelete}
+              disabled={delText !== 'DELETE' || deleting}
+              className="bg-accent px-5 py-3 font-display text-sm font-semibold uppercase tracking-widest text-black disabled:opacity-40"
+            >
+              {deleting ? '...' : 'Delete'}
+            </button>
+          </div>
+        </div>
       </div>
       {mapOpen && (
         <MapPicker
