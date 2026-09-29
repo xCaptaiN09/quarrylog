@@ -13,7 +13,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     down: false,
     pointerId: -1,
     startX: 0,
-    startScroll: 0,
+    lastX: 0,
     moved: false,
     captured: false,
   })
@@ -32,6 +32,12 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
       }
     }),
   ]
+
+  const stopAnimations = () => {
+    window.clearTimeout(settleTimer.current)
+    if (raf.current) cancelAnimationFrame(raf.current)
+    ref.current?.style.setProperty('scroll-behavior', 'auto')
+  }
 
   const centerItem = (id: string, smooth: boolean) => {
     const el = ref.current
@@ -59,7 +65,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     })
     if (!best) return
     if (best !== selected) onSelect(best)
-    if (settle) centerItem(best, true)
+    if (settle && bestD > 4) centerItem(best, true)
   }
 
   useEffect(() => {
@@ -81,6 +87,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
+      window.clearTimeout(settleTimer.current)
       el.scrollLeft += (e.deltaY + e.deltaX) * 2
     }
     el.addEventListener('wheel', onWheel, { passive: false })
@@ -96,11 +103,12 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse' || !ref.current) return
+    stopAnimations()
     drag.current = {
       down: true,
       pointerId: e.pointerId,
       startX: e.clientX,
-      startScroll: ref.current.scrollLeft,
+      lastX: e.clientX,
       moved: false,
       captured: false,
     }
@@ -108,15 +116,15 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!drag.current.down || !ref.current) return
-    const dx = e.clientX - drag.current.startX
-    if (!drag.current.captured && Math.abs(dx) > 5) {
+    if (!drag.current.captured && Math.abs(e.clientX - drag.current.startX) > 5) {
       drag.current.captured = true
       drag.current.moved = true
       ref.current.setPointerCapture(drag.current.pointerId)
     }
     if (drag.current.captured) {
-      ref.current.scrollLeft = drag.current.startScroll - dx
+      ref.current.scrollLeft += drag.current.lastX - e.clientX
     }
+    drag.current.lastX = e.clientX
   }
 
   const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -146,7 +154,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
-        className="no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 active:cursor-grabbing"
+        className="no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 [touch-action:pan-x] active:cursor-grabbing"
         style={{
           maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
           WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
