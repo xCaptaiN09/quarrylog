@@ -26,3 +26,12 @@ body {
   background: var(--color-accent);
   color: #000;
 }
+
+.leaflet-container {
+  background: #0a0a0a;
+  font-family: var(--font-body);
+}
+
+.leaflet-tile {
+  filter: grayscale(1) invert(0.92) brightness(0.85) contrast(0.9);
+}

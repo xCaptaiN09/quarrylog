@@ -33,14 +33,14 @@ export default function App() {
   return (
     <div className="relative mx-auto min-h-dvh w-full max-w-[430px] bg-bg sm:border-x sm:border-line md:max-w-none md:border-x-0 md:px-12 lg:px-24">
       <header className="hidden items-center justify-between py-6 md:flex">
-        <span className="font-display text-lg font-semibold tracking-tight">Quarrylog</span>
+        <span className="font-display text-xl font-semibold tracking-tight">Quarrylog</span>
         <nav className="flex gap-8">
           {tabs.map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`text-xs uppercase tracking-widest ${
-                tab === id ? 'text-accent' : 'text-muted hover:text-white'
+              className={`border-b-2 px-1 pb-2 text-sm uppercase tracking-widest transition-colors ${
+                tab === id ? 'border-accent text-white' : 'border-transparent text-muted hover:text-white'
               }`}
             >
               {label}

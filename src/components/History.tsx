@@ -1,22 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Download, MapPin, Phone } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, MapPin, Pencil, Phone } from 'lucide-react'
 import { supabase } from '../supabase'
 import type { Trip } from '../types'
 import { fmtDate, fmtTime } from '../lib/time'
 import { downloadCsv } from '../lib/csv'
+import TripEditor from './TripEditor'
 
 export default function History() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [open, setOpen] = useState<string | null>(null)
+  const [editing, setEditing] = useState<Trip | null>(null)
 
-  useEffect(() => {
+  const load = () => {
     supabase
       .from('trips')
       .select('*')
       .order('trip_date', { ascending: false })
       .order('trip_time', { ascending: false })
       .limit(2000)
-      .then(({ data }) => { if (data) setTrips(data as Trip[]) })
+      .then(({ data }) => {
+        if (data) setTrips(data as Trip[])
+      })
+  }
+
+  useEffect(() => {
+    load()
   }, [])
 
   const byDate = useMemo(() => {
@@ -33,61 +41,100 @@ export default function History() {
     <div className="px-6 pt-8 md:px-0 md:pt-0">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold tracking-tight">History</h1>
-        <button onClick={() => downloadCsv(trips, 'quarrylog-all.csv')} className="flex items-center gap-2 text-xs uppercase tracking-widest text-accent">
+        <button
+          onClick={() => downloadCsv(trips, 'quarrylog-all.csv')}
+          className="flex items-center gap-2 text-xs uppercase tracking-widest text-accent"
+        >
           <Download size={14} strokeWidth={1.5} /> CSV
         </button>
       </div>
-      <div className="mt-6 md:columns-2 md:gap-12 xl:columns-3">
+      <div className="mt-6">
         {byDate.map(([date, list]) => {
-          const counts = new Map<string, Trip[]>()
-          for (const t of list) counts.set(t.plate_number, [...(counts.get(t.plate_number) ?? []), t])
+          const counts = new Map<string, number>()
+          for (const t of list) counts.set(t.plate_number, (counts.get(t.plate_number) ?? 0) + 1)
           const isOpen = open === date
           return (
-            <section key={date} className="break-inside-avoid border-b border-line py-4">
-              <button onClick={() => setOpen(isOpen ? null : date)} className="flex w-full items-center justify-between">
+            <section key={date} className="border-b border-line py-4">
+              <button
+                onClick={() => setOpen(isOpen ? null : date)}
+                className="flex w-full items-center justify-between"
+              >
                 <span className="font-display text-lg tracking-tight">{fmtDate(date)}</span>
                 <span className="flex items-center gap-2 text-sm text-muted">
                   {list.length} loads
-                  {isOpen ? <ChevronDown size={16} strokeWidth={1.5} /> : <ChevronRight size={16} strokeWidth={1.5} />}
+                  {isOpen ? (
+                    <ChevronDown size={16} strokeWidth={1.5} />
+                  ) : (
+                    <ChevronRight size={16} strokeWidth={1.5} />
+                  )}
                 </span>
               </button>
               {isOpen && (
-                <ul className="mt-3">
-                  {[...counts.entries()].map(([plate, rows]) => (
-                    <li key={plate} className="border-t border-line/60 py-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-display tracking-tight">{plate}</span>
-                        <span className="text-sm text-accent">{rows.length} loads</span>
-                      </div>
-                      <p className="mt-1 text-xs text-muted">{rows.map((r) => fmtTime(r.trip_time)).join(' · ')}</p>
-                      <div className="mt-2 space-y-1">
-                        {rows.map((r) => (
-                          <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-                            {r.driver_phone && (
-                              <a href={`tel:${r.driver_phone}`} className="flex items-center gap-1 hover:text-accent">
-                                <Phone size={12} /> {r.driver_phone}
-                              </a>
-                            )}
-                            {r.location_lat && r.location_lng && (
-                              <a href={`https://www.google.com/maps?q=${r.location_lat},${r.location_lng}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-accent">
-                                <MapPin size={12} /> {r.location_name || 'View Map'}
-                              </a>
-                            )}
-                            {r.image_url && (
-                              <a href={r.image_url} target="_blank" rel="noreferrer" className="underline hover:text-accent">Photo</a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-3">
+                  <div className="flex flex-wrap gap-2">
+                    {[...counts.entries()].map(([p, c]) => (
+                      <span key={p} className="border border-line px-2 py-1 text-xs text-muted">
+                        {p} × {c}
+                      </span>
+                    ))}
+                  </div>
+                  <ul className="mt-4 space-y-3">
+                    {list.map((t) => (
+                      <li key={t.id} className="border border-line p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="font-display text-xl tracking-tight">{t.plate_number}</span>
+                          <span className="flex items-center gap-3 text-sm text-muted">
+                            {fmtTime(t.trip_time)}
+                            <button onClick={() => setEditing(t)} className="hover:text-accent">
+                              <Pencil size={14} strokeWidth={1.5} />
+                            </button>
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                          {t.driver_phone && (
+                            <a href={`tel:${t.driver_phone}`} className="flex items-center gap-1 hover:text-accent">
+                              <Phone size={12} strokeWidth={1.5} /> {t.driver_phone}
+                            </a>
+                          )}
+                          {t.location_lat !== null && t.location_lng !== null && (
+                            <a
+                              href={`https://www.google.com/maps?q=${t.location_lat},${t.location_lng}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 hover:text-accent"
+                            >
+                              <MapPin size={12} strokeWidth={1.5} /> {t.location_name || 'View map'}
+                            </a>
+                          )}
+                          {!t.driver_phone && !t.location_name && !t.location_lat && (
+                            <span>No extra details</span>
+                          )}
+                        </div>
+                        {t.image_url && (
+                          <a href={t.image_url} target="_blank" rel="noreferrer">
+                            <img src={t.image_url} alt="" className="mt-3 h-20 w-20 object-cover" />
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </section>
           )
         })}
         {byDate.length === 0 && <p className="py-8 text-sm text-muted">No trips recorded yet.</p>}
       </div>
+      {editing && (
+        <TripEditor
+          trip={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null)
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }
