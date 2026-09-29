@@ -80,7 +80,11 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   }, [])
 
   useEffect(() => {
-    if (half > 0) centerItem(selected, false)
+    if (half > 0) {
+      centerItem(selected, false)
+      const t = window.setTimeout(() => centerItem(selected, false), 250)
+      return () => window.clearTimeout(t)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [half, dates.length])
 
@@ -125,6 +129,10 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!drag.current.down || !ref.current) return
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      endDrag(e)
+      return
+    }
     if (!drag.current.captured && Math.abs(e.clientX - drag.current.startX) > 5) {
       drag.current.captured = true
       drag.current.moved = true
