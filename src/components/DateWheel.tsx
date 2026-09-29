@@ -99,9 +99,10 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   const onScroll = () => {
     if (raf.current) cancelAnimationFrame(raf.current)
     raf.current = requestAnimationFrame(() => pickCenter(false))
+    if (drag.current.down) return
     window.clearTimeout(settleTimer.current)
     settleTimer.current = window.setTimeout(() => {
-      if (!momentumRaf.current) pickCenter(true)
+      if (!momentumRaf.current && !drag.current.down) pickCenter(true)
     }, 160)
   }
 
@@ -109,6 +110,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     if (e.pointerType !== 'mouse' || !ref.current) return
     stopMomentum()
     window.clearTimeout(settleTimer.current)
+    ref.current.scrollTo({ left: ref.current.scrollLeft, behavior: 'auto' })
     velocity.current = 0
     drag.current = {
       down: true,
@@ -166,6 +168,10 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     }
     drag.current.down = false
     drag.current.captured = false
+    window.clearTimeout(settleTimer.current)
+    settleTimer.current = window.setTimeout(() => {
+      if (!momentumRaf.current) pickCenter(true)
+    }, 160)
   }
 
   const onClickCapture = (e: ReactMouseEvent) => {
