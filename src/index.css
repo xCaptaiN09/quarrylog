@@ -58,23 +58,3 @@ body {
 .slide-in {
   animation: slide-in 0.25s ease;
 }
-
-@media (min-width: 768px) {
-  .no-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: #3a3a3a transparent;
-  }
-
-  .no-scrollbar::-webkit-scrollbar {
-    display: block;
-    height: 4px;
-  }
-
-  .no-scrollbar::-webkit-scrollbar-thumb {
-    background: #3a3a3a;
-  }
-
-  .no-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-}
