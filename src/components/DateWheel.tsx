@@ -10,68 +10,36 @@ interface Props {
 export default function DateWheel({ dates, selected, onSelect }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false })
-  const scrollTimer = useRef<number | undefined>(undefined)
-  const selectedRef = useRef(selected)
-  selectedRef.current = selected
-
-  const centerOn = (id: string, smooth: boolean) => {
-    const el = ref.current
-    if (!el) return
-    const target = el.querySelector<HTMLElement>(`[data-id="${id}"]`)
-    if (!target) return
-    const left = target.offsetLeft - el.clientWidth / 2 + target.clientWidth / 2
-    el.scrollTo({ left, behavior: smooth ? 'smooth' : 'auto' })
-  }
-
-  useEffect(() => {
-    centerOn(selected, false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dates.length])
-
-  useEffect(() => {
-    centerOn(selected, true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected])
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      el.scrollLeft += e.deltaY + e.deltaX
+      el.scrollLeft += (e.deltaY + e.deltaX) * 2
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  const pickCenter = () => {
+  useEffect(() => {
     const el = ref.current
     if (!el) return
-    const center = el.scrollLeft + el.clientWidth / 2
-    let bestId: string | null = null
-    let bestDist = Infinity
-    el.querySelectorAll<HTMLElement>('[data-id]').forEach((child) => {
-      const c = child.offsetLeft + child.clientWidth / 2
-      const d = Math.abs(c - center)
-      if (d < bestDist) {
-        bestDist = d
-        bestId = child.dataset.id ?? null
-      }
+    const target = el.querySelector<HTMLElement>(`[data-id="${selected}"]`)
+    if (!target) return
+    el.scrollTo({
+      left: target.offsetLeft - el.clientWidth / 2 + target.clientWidth / 2,
+      behavior: 'auto',
     })
-    if (bestId && bestId !== selectedRef.current) onSelect(bestId)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dates.length])
 
-  const onScroll = () => {
-    window.clearTimeout(scrollTimer.current)
-    scrollTimer.current = window.setTimeout(pickCenter, 150)
-  }
-
-  const onPointerDown = (e: ReactPointerEvent) => {
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse' || !ref.current) return
     drag.current = { down: true, startX: e.clientX, startScroll: ref.current.scrollLeft, moved: false }
   }
 
-  const onPointerMove = (e: ReactPointerEvent) => {
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!drag.current.down || !ref.current) return
     const dx = e.clientX - drag.current.startX
     if (Math.abs(dx) > 5) drag.current.moved = true
@@ -90,6 +58,18 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     }
   }
 
+  const pick = (id: string) => {
+    onSelect(id)
+    const el = ref.current
+    if (!el) return
+    const target = el.querySelector<HTMLElement>(`[data-id="${id}"]`)
+    if (!target) return
+    el.scrollTo({
+      left: target.offsetLeft - el.clientWidth / 2 + target.clientWidth / 2,
+      behavior: 'smooth',
+    })
+  }
+
   const items: { id: string | 'all'; label: string; sub: string }[] = [
     { id: 'all', label: 'All', sub: 'dates' },
     ...dates.map((d) => {
@@ -103,43 +83,34 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   ]
 
   return (
-    <div className="flex justify-center">
-      <div
-        ref={ref}
-        onScroll={onScroll}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerLeave={endDrag}
-        onClickCapture={onClickCapture}
-        className="no-scrollbar w-full max-w-lg cursor-grab select-none overflow-x-auto px-[45%] py-2 active:cursor-grabbing"
-      >
-        <div className="flex w-max gap-4">
-          {items.map((it) => {
-            const active = selected === it.id
-            return (
-              <button
-                key={it.id}
-                data-id={it.id}
-                onClick={() => onSelect(it.id)}
-                className="flex flex-col items-center gap-1 px-2"
-              >
-                <span className={`w-px transition-all ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
-                <span
-                  className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}
-                >
-                  {it.label}
-                </span>
-                <span
-                  className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}
-                >
-                  {it.sub}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+    <div
+      ref={ref}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onClickCapture={onClickCapture}
+      className="no-scrollbar flex cursor-grab select-none gap-3 overflow-x-auto overscroll-x-contain px-6 py-2 active:cursor-grabbing"
+    >
+      {items.map((it) => {
+        const active = selected === it.id
+        return (
+          <button
+            key={it.id}
+            data-id={it.id}
+            onClick={() => pick(it.id)}
+            className="flex flex-col items-center gap-1 px-2"
+          >
+            <span className={`w-px transition-all ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
+            <span className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}>
+              {it.label}
+            </span>
+            <span className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}>
+              {it.sub}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }
