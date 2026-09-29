@@ -9,13 +9,17 @@ interface Props {
 
 export default function DateWheel({ dates, selected, onSelect }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
   const drag = useRef({
     down: false,
     pointerId: -1,
     startX: 0,
     lastX: 0,
+    lastTime: 0,
+    velocity: 0,
     moved: false,
     captured: false,
+    offset: 0,
   })
   const raf = useRef<number | null>(null)
   const settleTimer = useRef<number | undefined>(undefined)
@@ -36,27 +40,33 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   const stopAnimations = () => {
     window.clearTimeout(settleTimer.current)
     if (raf.current) cancelAnimationFrame(raf.current)
-    ref.current?.style.setProperty('scroll-behavior', 'auto')
+    raf.current = null
   }
 
   const centerItem = (id: string, smooth: boolean) => {
     const el = ref.current
-    if (!el) return
-    const t = el.querySelector<HTMLElement>(`[data-id="${id}"]`)
+    const strip = stripRef.current
+    if (!el || !strip) return
+    const t = strip.querySelector<HTMLElement>(`[data-id="${id}"]`)
     if (!t) return
-    el.scrollTo({
-      left: t.offsetLeft + t.clientWidth / 2 - el.clientWidth / 2,
-      behavior: smooth ? 'smooth' : 'auto',
-    })
+    const target = t.offsetLeft + t.clientWidth / 2 - el.clientWidth / 2
+    if (smooth) {
+      strip.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+    } else {
+      strip.style.transition = 'none'
+    }
+    strip.style.transform = `translateX(-${target}px)`
+    drag.current.offset = target
   }
 
   const pickCenter = (settle: boolean) => {
     const el = ref.current
-    if (!el) return
-    const center = el.scrollLeft + el.clientWidth / 2
+    const strip = stripRef.current
+    if (!el || !strip) return
+    const center = drag.current.offset + el.clientWidth / 2
     let best: string | null = null
     let bestD = Infinity
-    el.querySelectorAll<HTMLElement>('[data-id]').forEach((c) => {
+    strip.querySelectorAll<HTMLElement>('[data-id]').forEach((c) => {
       const d = Math.abs(c.offsetLeft + c.clientWidth / 2 - center)
       if (d < bestD) {
         bestD = d
@@ -65,7 +75,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     })
     if (!best) return
     if (best !== selected) onSelect(best)
-    if (settle && bestD > 4) centerItem(best, true)
+    if (settle) centerItem(best, true)
   }
 
   useEffect(() => {
@@ -82,21 +92,15 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [half, dates.length])
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      window.clearTimeout(settleTimer.current)
-      el.scrollLeft += (e.deltaY + e.deltaX) * 2
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [])
-
-  const onScroll = () => {
-    if (raf.current) cancelAnimationFrame(raf.current)
-    raf.current = requestAnimationFrame(() => pickCenter(false))
+  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    stopAnimations()
+    const strip = stripRef.current
+    if (!strip || !ref.current) return
+    const delta = (e.deltaY + e.deltaX) * 0.8
+    drag.current.offset += delta
+    strip.style.transition = 'none'
+    strip.style.transform = `translateX(-${drag.current.offset}px)`
     window.clearTimeout(settleTimer.current)
     settleTimer.current = window.setTimeout(() => pickCenter(true), 160)
   }
@@ -104,13 +108,20 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse' || !ref.current) return
     stopAnimations()
+    const strip = stripRef.current
+    if (strip) {
+      strip.style.transition = 'none'
+    }
     drag.current = {
       down: true,
       pointerId: e.pointerId,
       startX: e.clientX,
       lastX: e.clientX,
+      lastTime: Date.now(),
+      velocity: 0,
       moved: false,
       captured: false,
+      offset: drag.current.offset,
     }
   }
 
@@ -122,14 +133,35 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
       ref.current.setPointerCapture(drag.current.pointerId)
     }
     if (drag.current.captured) {
-      ref.current.scrollLeft += drag.current.lastX - e.clientX
+      const strip = stripRef.current
+      if (strip) {
+        const now = Date.now()
+        const dt = now - drag.current.lastTime
+        const dx = drag.current.lastX - e.clientX
+        if (dt > 0) {
+          drag.current.velocity = dx / dt
+        }
+        drag.current.offset += dx
+        drag.current.lastX = e.clientX
+        drag.current.lastTime = now
+        strip.style.transform = `translateX(-${drag.current.offset}px)`
+      }
     }
-    drag.current.lastX = e.clientX
   }
 
   const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const strip = stripRef.current
     if (drag.current.captured && ref.current?.hasPointerCapture(e.pointerId)) {
       ref.current.releasePointerCapture(e.pointerId)
+    }
+    if (drag.current.captured && strip && Math.abs(drag.current.velocity) > 0.2) {
+      const momentum = drag.current.velocity * 200
+      drag.current.offset += momentum
+      strip.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+      strip.style.transform = `translateX(-${drag.current.offset}px)`
+      settleTimer.current = window.setTimeout(() => pickCenter(true), 620)
+    } else if (drag.current.captured) {
+      pickCenter(true)
     }
     drag.current.down = false
     drag.current.captured = false
@@ -148,44 +180,44 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
       <span className="pointer-events-none absolute left-1/2 top-0 z-10 h-2 w-px -translate-x-1/2 bg-accent" />
       <div
         ref={ref}
-        onScroll={onScroll}
+        onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
-        className="no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 [touch-action:pan-x] active:cursor-grabbing"
+        className="cursor-grab select-none overflow-hidden py-4 active:cursor-grabbing"
         style={{
           maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
           WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
         }}
       >
-        <div style={{ width: half }} className="shrink-0" />
-        {items.map((it) => {
-          const active = selected === it.id
-          return (
-            <button
-              key={it.id}
-              data-id={it.id}
-              onClick={() => {
-                onSelect(it.id)
-                centerItem(it.id, true)
-              }}
-              className={`flex shrink-0 flex-col items-center gap-1 transition-transform duration-150 ${
-                active ? 'scale-125' : 'scale-100'
-              }`}
-            >
-              <span className={`w-px ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
-              <span className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}>
-                {it.label}
-              </span>
-              <span className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}>
-                {it.sub}
-              </span>
-            </button>
-          )
-        })}
-        <div style={{ width: half }} className="shrink-0" />
+        <div ref={stripRef} className="flex items-start gap-6" style={{ paddingLeft: half, paddingRight: half }}>
+          {items.map((it) => {
+            const active = selected === it.id
+            return (
+              <button
+                key={it.id}
+                data-id={it.id}
+                onClick={() => {
+                  onSelect(it.id)
+                  centerItem(it.id, true)
+                }}
+                className={`flex shrink-0 flex-col items-center gap-1 transition-transform duration-150 ${
+                  active ? 'scale-125' : 'scale-100'
+                }`}
+              >
+                <span className={`w-px ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
+                <span className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}>
+                  {it.label}
+                </span>
+                <span className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}>
+                  {it.sub}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
