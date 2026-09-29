@@ -13,16 +13,9 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     down: false,
     startX: 0,
     scrollStart: 0,
-    lastX: 0,
-    lastT: 0,
     moved: false,
-    vel: 0,
   })
-  const momentumRaf = useRef<number | null>(null)
-  const pickRaf = useRef<number | null>(null)
-  const settleTimer = useRef<number | undefined>(undefined)
-  const targetIdx = useRef<number | null>(null)
-  const settling = useRef(false)
+  const selTimer = useRef<number | undefined>(undefined)
   const selectedRef = useRef(selected)
   const onSelectRef = useRef(onSelect)
   selectedRef.current = selected
@@ -40,206 +33,158 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     }),
   ]
 
-  const stopMomentum = () => {
-    if (momentumRaf.current) cancelAnimationFrame(momentumRaf.current)
-    momentumRaf.current = null
-  }
-
-  const cancelSettle = () => {
-    if (settling.current) {
-      settling.current = false
-      const el = ref.current
-      if (el) el.scrollTo({ left: el.scrollLeft, behavior: 'auto' })
-    }
-  }
-
-  const children = (): HTMLElement[] => {
+  // Wheel steps whole items (camera-dial feel); CSS snap-mandatory
+  // covers touch/drag. JS only syncs selection to centered item.
+  const getItems = (): HTMLElement[] => {
     const el = ref.current
     if (!el) return []
     return Array.from(el.querySelectorAll<HTMLElement>('[data-id]'))
   }
 
-  const itemCenter = (el: HTMLElement, c: HTMLElement) => {
-    const elRect = el.getBoundingClientRect()
-    const cRect = c.getBoundingClientRect()
-    return el.scrollLeft + (cRect.left - elRect.left) + cRect.width / 2
-  }
-
-  const nearestIndex = () => {
+  const syncSelection = () => {
     const el = ref.current
-    if (!el) return 0
-    const list = children()
-    if (list.length === 0) return 0
+    if (!el) return
+    const list = getItems()
+    if (list.length === 0) return
     const center = el.scrollLeft + el.clientWidth / 2
-    let best = 0
+    let best: string | null = null
     let bestD = Infinity
-    list.forEach((c, i) => {
-      const d = Math.abs(itemCenter(el, c) - center)
+    for (const c of list) {
+      const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - center)
       if (d < bestD) {
         bestD = d
-        best = i
+        best = c.dataset.id ?? null
       }
-    })
-    return best
-  }
-
-  const centerToIndex = (idx: number, smooth: boolean) => {
-    const el = ref.current
-    const list = children()
-    const t = list[idx]
-    if (!el || !t) return
-    const target = itemCenter(el, t) - el.clientWidth / 2
-    const max = el.scrollWidth - el.clientWidth
-    const clamped = Math.max(0, Math.min(max, target))
-    if (smooth) settling.current = true
-    el.scrollTo({ left: clamped, behavior: smooth ? 'smooth' : 'auto' })
-  }
-
-  const centerItem = (id: string, smooth: boolean) => {
-    const list = children()
-    const idx = list.findIndex((c) => c.dataset.id === id)
-    if (idx < 0) return
-    targetIdx.current = idx
-    centerToIndex(idx, smooth)
-  }
-
-  const pickLive = () => {
-    const list = children()
-    if (list.length === 0) return
-    const idx = nearestIndex()
-    const id = list[idx].dataset.id ?? null
-    if (!id) return
-    targetIdx.current = idx
-    if (id !== selectedRef.current) onSelectRef.current(id as string | 'all')
-  }
-
-  const snapToNearest = (smooth: boolean) => {
-    const el = ref.current
-    const list = children()
-    if (!el || list.length === 0) return
-    const idx = nearestIndex()
-    const id = list[idx].dataset.id ?? null
-    if (!id) return
-    targetIdx.current = idx
-    if (id !== selectedRef.current) onSelectRef.current(id as string | 'all')
-    const center = el.scrollLeft + el.clientWidth / 2
-    if (Math.abs(itemCenter(el, list[idx]) - center) > 2) {
-      centerToIndex(idx, smooth)
-    } else {
-      settling.current = false
     }
+    if (best && best !== selectedRef.current) onSelectRef.current(best as string | 'all')
   }
 
-  const scheduleSettle = (delay = 140) => {
-    window.clearTimeout(settleTimer.current)
-    settleTimer.current = window.setTimeout(() => {
-      if (state.current.down) return
-      if (momentumRaf.current) return
-      snapToNearest(true)
-    }, delay)
+  const scheduleSync = () => {
+    window.clearTimeout(selTimer.current)
+    selTimer.current = window.setTimeout(syncSelection, 60)
+  }
+
+  const centerId = (id: string) => {
+    const el = ref.current
+    if (!el) return
+    const t = el.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`)
+    if (!t) return
+    // scrollIntoView honors CSS scroll-snap + smooth behavior natively
+    t.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }
 
   useEffect(() => {
     if (dates.length > 0) {
-      targetIdx.current = null
-      settling.current = false
-      centerItem(selectedRef.current, false)
-      const t = window.setTimeout(() => {
-        settling.current = false
-        centerItem(selectedRef.current, false)
-      }, 250)
-      return () => window.clearTimeout(t)
+      const t1 = window.setTimeout(() => {
+        const el = ref.current
+        if (!el) return
+        const t = el.querySelector<HTMLElement>(`[data-id="${CSS.escape(selectedRef.current)}"]`)
+        if (t) t.scrollIntoView({ inline: 'center', block: 'nearest' })
+      }, 50)
+      const t2 = window.setTimeout(() => {
+        const el = ref.current
+        if (!el) return
+        const t = el.querySelector<HTMLElement>(`[data-id="${CSS.escape(selectedRef.current)}"]`)
+        if (t) t.scrollIntoView({ inline: 'center', block: 'nearest' })
+      }, 300)
+      return () => {
+        window.clearTimeout(t1)
+        window.clearTimeout(t2)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dates.length])
 
   useEffect(() => {
     return () => {
-      stopMomentum()
-      if (pickRaf.current) cancelAnimationFrame(pickRaf.current)
-      window.clearTimeout(settleTimer.current)
+      window.clearTimeout(selTimer.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Wheel: accumulate deltas and step whole items (camera-dial feel).
+  // scrollTo with behavior:'auto' jumps instantly so it can never
+  // rest between dates; CSS snap covers touch/drag.
   useEffect(() => {
     const el = ref.current
     if (!el) return
+    let acc = 0
+    let accTimer: number | undefined
+    const STEP = 80 // ~1 item spacing: 1 notch ≈ 1 date
+    const reset = () => {
+      accTimer = window.setTimeout(() => {
+        acc = 0
+      }, 180)
+    }
     const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      stopMomentum()
-      window.clearTimeout(settleTimer.current)
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
-      const mult = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 200 : 1
-      const d = delta * mult
+      if (e.ctrlKey) return // pinch-zoom: leave to browser
+      const mult = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? el.clientWidth : 1
+      const dx = e.deltaX * mult
+      const dy = e.deltaY * mult
+      const d = Math.abs(dx) > Math.abs(dy) ? dx : dy
       if (!d) return
-      if (Math.abs(d) >= 50) {
-        cancelSettle()
-        const list = children()
-        if (list.length === 0) return
-        const base = targetIdx.current ?? nearestIndex()
-        const dir = d > 0 ? 1 : -1
-        const next = Math.max(0, Math.min(list.length - 1, base + dir))
-        targetIdx.current = next
-        const id = list[next].dataset.id as string | 'all'
-        if (id && id !== selectedRef.current) onSelectRef.current(id)
-        centerToIndex(next, true)
-        scheduleSettle(200)
-      } else {
-        cancelSettle()
-        targetIdx.current = null
-        el.scrollLeft += d * 1.5
-        scheduleSettle(140)
+      // At either edge, let the page scroll instead of trapping it.
+      const max = el.scrollWidth - el.clientWidth
+      if ((el.scrollLeft <= 0 && d < 0) || (el.scrollLeft >= max - 1 && d > 0)) {
+        acc = 0
+        return
       }
+      e.preventDefault()
+      window.clearTimeout(accTimer)
+      acc += d
+      const steps = Math.trunc(acc / STEP)
+      if (steps !== 0) {
+        acc -= steps * STEP
+        const list = getItems()
+        if (list.length === 0) return
+        const center = el.scrollLeft + el.clientWidth / 2
+        let base = 0
+        let bestD = Infinity
+        list.forEach((c, i) => {
+          const dd = Math.abs(c.offsetLeft + c.offsetWidth / 2 - center)
+          if (dd < bestD) {
+            bestD = dd
+            base = i
+          }
+        })
+        const next = Math.max(0, Math.min(list.length - 1, base + steps))
+        const t = list[next]
+        const target = t.offsetLeft + t.offsetWidth / 2 - el.clientWidth / 2
+        el.scrollTo({ left: target, behavior: 'auto' })
+        const id = t.dataset.id
+        if (id && id !== selectedRef.current) onSelectRef.current(id as string | 'all')
+      }
+      reset()
     }
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      window.clearTimeout(accTimer)
+    }
   }, [])
 
   const onScroll = () => {
-    const el = ref.current
-    if (!el) return
-    if (pickRaf.current) cancelAnimationFrame(pickRaf.current)
-    pickRaf.current = requestAnimationFrame(() => {
-      if (!settling.current && !state.current.down && !momentumRaf.current) pickLive()
-    })
-    if (state.current.down) return
-    if (momentumRaf.current) return
-    if (settling.current) {
-      scheduleSettle(180)
-      return
-    }
-    scheduleSettle(140)
+    if (state.current.down) syncSelection()
+    else scheduleSync()
   }
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse') return
     const el = ref.current
     if (!el) return
-    stopMomentum()
-    cancelSettle()
-    window.clearTimeout(settleTimer.current)
-    targetIdx.current = null
+    // Native scroll + CSS snap handles momentum & settling.
+    // Just track drag so a drag doesn't trigger a click.
     const s = state.current
     s.down = true
     s.startX = e.clientX
-    s.lastX = e.clientX
-    s.lastT = performance.now()
     s.scrollStart = el.scrollLeft
     s.moved = false
-    s.vel = 0
 
     const move = (ev: MouseEvent) => {
       if (!s.down) return
       const total = ev.clientX - s.startX
       if (Math.abs(total) > 5) s.moved = true
       el.scrollLeft = s.scrollStart - total
-      const now = performance.now()
-      const dt = now - s.lastT
-      if (dt > 0) s.vel = Math.max(-3, Math.min(3, (s.lastX - ev.clientX) / dt))
-      s.lastX = ev.clientX
-      s.lastT = now
     }
 
     const up = () => {
@@ -247,25 +192,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
       s.down = false
       window.removeEventListener('mousemove', move)
       window.removeEventListener('mouseup', up)
-      if (Math.abs(s.vel) > 0.15) {
-        let last = performance.now()
-        const step = (now: number) => {
-          const dt = Math.min(now - last, 64)
-          last = now
-          s.vel *= Math.pow(0.96, dt / 16.7)
-          const before = el.scrollLeft
-          el.scrollLeft += s.vel * dt
-          if (Math.abs(s.vel) > 0.02 && el.scrollLeft !== before) {
-            momentumRaf.current = requestAnimationFrame(step)
-          } else {
-            momentumRaf.current = null
-            snapToNearest(true)
-          }
-        }
-        momentumRaf.current = requestAnimationFrame(step)
-      } else {
-        snapToNearest(true)
-      }
+      scheduleSync()
     }
 
     window.addEventListener('mousemove', move)
@@ -288,7 +215,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
         onScroll={onScroll}
         onPointerDown={onPointerDown}
         onClickCapture={onClickCapture}
-        className="wheel-mask no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 [touch-action:pan-x] active:cursor-grabbing"
+        className="wheel-mask no-scrollbar flex snap-x snap-mandatory cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 [touch-action:pan-x] active:cursor-grabbing"
       >
         <div className="w-[45%] shrink-0" />
         {items.map((it) => {
@@ -298,14 +225,10 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
               key={it.id}
               data-id={it.id}
               onClick={() => {
-                stopMomentum()
-                cancelSettle()
-                window.clearTimeout(settleTimer.current)
                 onSelect(it.id)
-                centerItem(it.id, true)
-                scheduleSettle(220)
+                centerId(it.id)
               }}
-              className={`flex shrink-0 flex-col items-center gap-1 transition-transform duration-150 ${
+              className={`flex shrink-0 snap-center snap-always flex-col items-center gap-1 transition-transform duration-150 ${
                 active ? 'scale-125 md:scale-100' : 'scale-100'
               }`}
             >
