@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Download } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, MapPin, Phone } from 'lucide-react'
 import { supabase } from '../supabase'
 import type { Trip } from '../types'
 import { fmtDate, fmtTime } from '../lib/time'
@@ -16,9 +16,7 @@ export default function History() {
       .order('trip_date', { ascending: false })
       .order('trip_time', { ascending: false })
       .limit(2000)
-      .then(({ data }) => {
-        if (data) setTrips(data as Trip[])
-      })
+      .then(({ data }) => { if (data) setTrips(data as Trip[]) })
   }, [])
 
   const byDate = useMemo(() => {
@@ -35,10 +33,7 @@ export default function History() {
     <div className="px-6 pt-8 md:px-0 md:pt-0">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold tracking-tight">History</h1>
-        <button
-          onClick={() => downloadCsv(trips, 'quarrylog-all.csv')}
-          className="flex items-center gap-2 text-xs uppercase tracking-widest text-accent"
-        >
+        <button onClick={() => downloadCsv(trips, 'quarrylog-all.csv')} className="flex items-center gap-2 text-xs uppercase tracking-widest text-accent">
           <Download size={14} strokeWidth={1.5} /> CSV
         </button>
       </div>
@@ -49,18 +44,11 @@ export default function History() {
           const isOpen = open === date
           return (
             <section key={date} className="break-inside-avoid border-b border-line py-4">
-              <button
-                onClick={() => setOpen(isOpen ? null : date)}
-                className="flex w-full items-center justify-between"
-              >
+              <button onClick={() => setOpen(isOpen ? null : date)} className="flex w-full items-center justify-between">
                 <span className="font-display text-lg tracking-tight">{fmtDate(date)}</span>
                 <span className="flex items-center gap-2 text-sm text-muted">
                   {list.length} loads
-                  {isOpen ? (
-                    <ChevronDown size={16} strokeWidth={1.5} />
-                  ) : (
-                    <ChevronRight size={16} strokeWidth={1.5} />
-                  )}
+                  {isOpen ? <ChevronDown size={16} strokeWidth={1.5} /> : <ChevronRight size={16} strokeWidth={1.5} />}
                 </span>
               </button>
               {isOpen && (
@@ -71,9 +59,26 @@ export default function History() {
                         <span className="font-display tracking-tight">{plate}</span>
                         <span className="text-sm text-accent">{rows.length} loads</span>
                       </div>
-                      <p className="mt-1 text-xs text-muted">
-                        {rows.map((r) => fmtTime(r.trip_time)).join(' · ')}
-                      </p>
+                      <p className="mt-1 text-xs text-muted">{rows.map((r) => fmtTime(r.trip_time)).join(' · ')}</p>
+                      <div className="mt-2 space-y-1">
+                        {rows.map((r) => (
+                          <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                            {r.driver_phone && (
+                              <a href={`tel:${r.driver_phone}`} className="flex items-center gap-1 hover:text-accent">
+                                <Phone size={12} /> {r.driver_phone}
+                              </a>
+                            )}
+                            {r.location_lat && r.location_lng && (
+                              <a href={`https://www.google.com/maps?q=${r.location_lat},${r.location_lng}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-accent">
+                                <MapPin size={12} /> {r.location_name || 'View Map'}
+                              </a>
+                            )}
+                            {r.image_url && (
+                              <a href={r.image_url} target="_blank" rel="noreferrer" className="underline hover:text-accent">Photo</a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </li>
                   ))}
                 </ul>
