@@ -32,27 +32,17 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     if (!emblaApi) return
     let raf = 0
 
-    const pickFromDom = () => {
-      const root = emblaApi.rootNode()
-      const center = root.getBoundingClientRect().left + root.clientWidth / 2
-      let best: string | null = null
-      let bestD = Infinity
-      root.querySelectorAll('[data-id]').forEach((n) => {
-        const r = (n as HTMLElement).getBoundingClientRect()
-        const d = Math.abs(r.left + r.width / 2 - center)
-        if (d < bestD) {
-          bestD = d
-          best = (n as HTMLElement).dataset.id ?? null
-        }
-      })
-      if (best && best !== selectedRef.current) onSelectRef.current(best)
+    const update = () => {
+      const id = items[emblaApi.selectedScrollSnap()]?.id
+      if (id && id !== selectedRef.current) onSelectRef.current(id)
     }
 
     const onScroll = () => {
       cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(pickFromDom)
+      raf = requestAnimationFrame(update)
     }
 
+    emblaApi.on('select', update)
     emblaApi.on('scroll', onScroll)
 
     if (!positioned.current && items.length > 1) {
@@ -63,6 +53,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
 
     return () => {
       cancelAnimationFrame(raf)
+      emblaApi.off('select', update)
       emblaApi.off('scroll', onScroll)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,43 +72,39 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   }, [emblaApi])
 
   return (
-    <div className="relative">
-      <span className="pointer-events-none absolute left-1/2 top-0 z-10 h-2 w-px -translate-x-1/2 bg-accent" />
-      <div
-        ref={emblaRef}
-        className="overflow-hidden py-4"
-        style={{
-          maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
-          WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
-        }}
-      >
-        <div className="flex gap-6">
-          {items.map((it) => {
-            const active = selected === it.id
-            return (
-              <button
-                key={it.id}
-                data-id={it.id}
-                onClick={() => {
-                  onSelect(it.id)
-                  emblaApi?.scrollTo(items.findIndex((x) => x.id === it.id))
-                }}
-                style={{ flex: '0 0 auto' }}
-                className={`flex shrink-0 flex-col items-center gap-1 transition-transform duration-150 ${
-                  active ? 'scale-125' : 'scale-100'
-                }`}
-              >
-                <span className={`w-px ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
-                <span className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}>
-                  {it.label}
-                </span>
-                <span className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}>
-                  {it.sub}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+    <div
+      ref={emblaRef}
+      className="select-none overflow-hidden py-4"
+      style={{
+        maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
+        WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
+      }}
+    >
+      <div className="flex gap-6">
+        {items.map((it) => {
+          const active = selected === it.id
+          return (
+            <button
+              key={it.id}
+              onClick={() => {
+                onSelect(it.id)
+                emblaApi?.scrollTo(items.findIndex((x) => x.id === it.id))
+              }}
+              style={{ flex: '0 0 auto' }}
+              className={`flex shrink-0 flex-col items-center gap-1 transition-transform duration-150 ${
+                active ? 'scale-125' : 'scale-100'
+              }`}
+            >
+              <span className={`w-px ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
+              <span className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}>
+                {it.label}
+              </span>
+              <span className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}>
+                {it.sub}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
