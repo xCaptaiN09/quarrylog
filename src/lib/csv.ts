@@ -1,10 +1,11 @@
 import type { Trip } from '../types'
+import { fmtDate } from './time'
 
 export const downloadCsv = (trips: Trip[], filename: string) => {
   const rows = [
     ['date', 'time', 'plate_number', 'driver_name', 'driver_phone', 'location_name', 'lat', 'lng', 'image_url'],
     ...trips.map((t) => [
-      t.trip_date,
+      fmtDate(t.trip_date),
       t.trip_time,
       t.plate_number,
       t.driver_name ?? '',

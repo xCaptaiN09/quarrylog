@@ -7,9 +7,7 @@ export const localTimeStr = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinute
 
 export const fmtTime = (t: string) => t.slice(0, 5)
 
-export const fmtDate = (dateStr: string) =>
-  new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
+export const fmtDate = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-')
+  return `${d}/${m}/${y}`
+}

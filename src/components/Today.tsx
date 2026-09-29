@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   Award,
   Camera,
@@ -23,6 +25,7 @@ import MapPicker from './MapPicker'
 import TripEditor from './TripEditor'
 
 export default function Today() {
+  const [view, setView] = useState<'main' | 'recent'>('main')
   const [trips, setTrips] = useState<Trip[]>([])
   const [known, setKnown] = useState<string[]>([])
   const [plate, setPlate] = useState('')
@@ -167,244 +170,281 @@ export default function Today() {
     setTimeout(() => setFlash(''), 2500)
   }
 
-  return (
-    <div className="px-6 md:grid md:grid-cols-2 md:gap-x-12 md:px-0">
-      <header className="flex items-baseline justify-between pt-8 md:col-span-2 md:pt-0">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Today</h1>
-        <span className="text-xs uppercase tracking-widest text-muted">{fmtDate(today)}</span>
-      </header>
-
-      <section className="relative pt-6 md:col-span-2">
-        <span className="pointer-events-none absolute right-4 top-0 select-none font-display text-[110px] font-bold leading-none text-[#1C1C1C] md:text-[160px]">
-          {trips.length}
-        </span>
-        <p className="font-display text-5xl font-semibold tracking-tighter md:text-7xl">{trips.length}</p>
-        <p className="mt-1 text-sm text-muted">loads today</p>
-        <div className="mt-4 flex h-8 w-40 md:w-64">
-          <div
-            className="h-full bg-accent"
-            style={{ width: `${top && trips.length ? (top[1] / trips.length) * 100 : 0}%` }}
-          />
-          <div className="h-full flex-1 bg-[#3A3A3A]" />
+  const recentList = (limit?: number) => (limit ? trips.slice(0, limit) : trips).map((t) => (
+    <li key={t.id} className="flex items-center justify-between border-b border-line py-3">
+      <div className="flex items-center gap-3">
+        {t.image_url && <img src={t.image_url} alt="" className="h-10 w-10 object-cover" />}
+        <div>
+          <span className="font-display text-lg tracking-tight">{t.plate_number}</span>
+          {t.driver_name && <p className="text-xs text-muted">{t.driver_name}</p>}
         </div>
-        <p className="mt-3 text-sm text-muted">
-          {counts.size} lorries · last {trips[0] ? fmtTime(trips[0].trip_time) : '--:--'}
-        </p>
-      </section>
-
-      <section className="mt-6 grid grid-cols-2 gap-0.5 md:col-span-2 md:grid-cols-4">
-        <div className="flex aspect-square flex-col justify-between bg-accent p-4 text-black md:aspect-auto md:h-64">
-          <span className="text-sm">Lorries</span>
-          <div>
-            <p className="font-display text-4xl font-semibold tracking-tighter">{counts.size}</p>
-            <Truck className="mt-3" size={22} strokeWidth={1.5} />
-          </div>
-        </div>
-        <div className="flex aspect-square flex-col justify-between bg-tile p-4 md:aspect-auto md:h-64">
-          <span className="text-sm text-muted">Top lorry</span>
-          <div>
-            <p className="truncate font-display text-xl font-semibold tracking-tight md:text-2xl">
-              {top ? top[0] : '—'}
-            </p>
-            <Award className="mt-3 text-white" size={22} strokeWidth={1.5} />
-          </div>
-        </div>
-        <div className="flex aspect-square flex-col justify-between bg-tile p-4 md:aspect-auto md:h-64">
-          <span className="text-sm text-muted">Last load</span>
-          <div>
-            <p className="font-display text-2xl font-semibold tracking-tight">
-              {trips[0] ? fmtTime(trips[0].trip_time) : '--:--'}
-            </p>
-            <p className="text-xs text-muted">{trips[0]?.plate_number ?? ''}</p>
-            <Clock className="mt-2 text-white" size={22} strokeWidth={1.5} />
-          </div>
-        </div>
-        <button
-          onClick={() => inputRef.current?.focus()}
-          className="flex aspect-square flex-col justify-between bg-accent p-4 text-left text-black md:aspect-auto md:h-64"
-        >
-          <span className="text-sm">Quick add</span>
-          <Plus size={22} strokeWidth={1.5} />
+      </div>
+      <span className="flex items-center gap-4 text-sm text-muted">
+        {fmtTime(t.trip_time)}
+        <button onClick={() => setEditing(t)} className="hover:text-accent">
+          <Pencil size={14} strokeWidth={1.5} />
         </button>
-      </section>
+      </span>
+    </li>
+  ))
 
-      <form onSubmit={add} className="pt-10 md:col-start-1">
-        <label className="text-xs uppercase tracking-widest text-muted" htmlFor="plate">
-          Plate number
-        </label>
-        <input
-          id="plate"
-          ref={inputRef}
-          value={plate}
-          onChange={(e) => setPlate(e.target.value.toUpperCase())}
-          placeholder="KL 00 A 0000"
-          className="w-full border-b border-line bg-transparent py-4 font-display text-3xl tracking-tight text-white outline-none placeholder:text-[#3A3A3A] focus:border-accent"
-        />
-        {suggestions.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-3">
-            {suggestions.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setPlate(s)}
-                className="border border-line px-3 py-2 font-display text-sm tracking-tight text-muted"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
+  return (
+    <>
+      {view === 'main' ? (
+        <div className="px-6 md:grid md:grid-cols-2 md:gap-x-12 md:px-0">
+          <header className="flex items-baseline justify-between pt-8 md:col-span-2 md:pt-0">
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Today</h1>
+            <span className="text-xs uppercase tracking-widest text-muted">{fmtDate(today)}</span>
+          </header>
 
-        <label className="mt-6 block text-xs uppercase tracking-widest text-muted" htmlFor="name">
-          Driver name (optional)
-        </label>
-        <div className="flex items-center gap-3 border-b border-line py-3">
-          <User size={16} className="text-muted" />
-          <input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Driver name"
-            className="flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#3A3A3A]"
-          />
-        </div>
+          <section className="relative pt-6 md:col-span-2">
+            <span className="pointer-events-none absolute right-4 top-0 select-none font-display text-[110px] font-bold leading-none text-[#1C1C1C] md:text-[160px]">
+              {trips.length}
+            </span>
+            <p className="font-display text-5xl font-semibold tracking-tighter md:text-7xl">
+              {trips.length}
+            </p>
+            <p className="mt-1 text-sm text-muted">loads today</p>
+            <div className="mt-4 flex h-8 w-40 md:w-64">
+              <div
+                className="h-full bg-accent"
+                style={{ width: `${top && trips.length ? (top[1] / trips.length) * 100 : 0}%` }}
+              />
+              <div className="h-full flex-1 bg-[#3A3A3A]" />
+            </div>
+            <p className="mt-3 text-sm text-muted">
+              {counts.size} lorries · last {trips[0] ? fmtTime(trips[0].trip_time) : '--:--'}
+            </p>
+          </section>
 
-        <label className="mt-6 block text-xs uppercase tracking-widest text-muted" htmlFor="phone">
-          Driver phone (optional)
-        </label>
-        <div className="flex items-center gap-3 border-b border-line py-3">
-          <Phone size={16} className="text-muted" />
-          <input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="98456 54455"
-            className="flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#3A3A3A]"
-          />
-        </div>
-
-        <label className="mt-6 block text-xs uppercase tracking-widest text-muted">
-          Location (optional)
-        </label>
-        <div className="flex items-center gap-3 border-b border-line py-3">
-          <MapPin size={16} className="text-muted" />
-          <input
-            value={locName}
-            onChange={(e) => setLocName(e.target.value)}
-            placeholder="Address or site name"
-            className="flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#3A3A3A]"
-          />
-          <button
-            type="button"
-            onClick={gps}
-            disabled={locating}
-            className="text-xs uppercase tracking-widest text-accent"
-          >
-            {locating ? '...' : 'GPS'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMapOpen(true)}
-            className="flex items-center gap-1 text-xs uppercase tracking-widest text-accent"
-          >
-            <MapIcon size={14} strokeWidth={1.5} /> Map
-          </button>
-        </div>
-        {lat !== null && lng !== null && (
-          <p className="mt-1 text-xs text-muted">
-            Coords: {lat.toFixed(5)}, {lng.toFixed(5)}
-          </p>
-        )}
-
-        <label className="mt-6 block text-xs uppercase tracking-widest text-muted">
-          Photo (optional)
-        </label>
-        <div className="flex items-center gap-3 border-b border-line py-3">
-          <label className="flex cursor-pointer items-center gap-2 border border-line px-3 py-2 text-xs uppercase tracking-widest text-muted">
-            <Camera size={14} strokeWidth={1.5} /> Camera
-            <input type="file" accept="image/*" capture="environment" onChange={pickImage} className="hidden" />
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 border border-line px-3 py-2 text-xs uppercase tracking-widest text-muted">
-            <ImageIcon size={14} strokeWidth={1.5} /> Upload
-            <input type="file" accept="image/*" onChange={pickImage} className="hidden" />
-          </label>
-          {imagePreview && <img src={imagePreview} alt="" className="h-12 w-12 object-cover" />}
-          {imageFile && (
+          <section className="mt-6 grid grid-cols-2 gap-0.5 md:col-span-2 md:grid-cols-4">
+            <div className="flex aspect-square flex-col justify-between bg-accent p-4 text-black md:aspect-auto md:h-64">
+              <span className="text-sm">Lorries</span>
+              <div>
+                <p className="font-display text-4xl font-semibold tracking-tighter">{counts.size}</p>
+                <Truck className="mt-3" size={22} strokeWidth={1.5} />
+              </div>
+            </div>
+            <div className="flex aspect-square flex-col justify-between bg-tile p-4 md:aspect-auto md:h-64">
+              <span className="text-sm text-muted">Top lorry</span>
+              <div>
+                <p className="truncate font-display text-xl font-semibold tracking-tight md:text-2xl">
+                  {top ? top[0] : '—'}
+                </p>
+                <Award className="mt-3 text-white" size={22} strokeWidth={1.5} />
+              </div>
+            </div>
+            <div className="flex aspect-square flex-col justify-between bg-tile p-4 md:aspect-auto md:h-64">
+              <span className="text-sm text-muted">Last load</span>
+              <div>
+                <p className="font-display text-2xl font-semibold tracking-tight">
+                  {trips[0] ? fmtTime(trips[0].trip_time) : '--:--'}
+                </p>
+                <p className="text-xs text-muted">{trips[0]?.plate_number ?? ''}</p>
+                <Clock className="mt-2 text-white" size={22} strokeWidth={1.5} />
+              </div>
+            </div>
             <button
-              type="button"
-              onClick={() => {
-                setImageFile(null)
-                setImagePreview(null)
-              }}
-              className="text-accent"
+              onClick={() => inputRef.current?.focus()}
+              className="flex aspect-square flex-col justify-between bg-accent p-4 text-left text-black md:aspect-auto md:h-64"
             >
-              <X size={16} strokeWidth={1.5} />
+              <span className="text-sm">Quick add</span>
+              <Plus size={22} strokeWidth={1.5} />
             </button>
-          )}
-        </div>
+          </section>
 
-        <div className="mt-4 flex items-center justify-between border-b border-line py-4">
-          <span className="text-sm text-muted">Time</span>
-          {manual ? (
-            <div className="flex items-center gap-3">
+          <form onSubmit={add} className="pt-10 md:col-start-1">
+            <label className="text-xs uppercase tracking-widest text-muted" htmlFor="plate">
+              Plate number
+            </label>
+            <input
+              id="plate"
+              ref={inputRef}
+              value={plate}
+              onChange={(e) => setPlate(e.target.value.toUpperCase())}
+              placeholder="KL 00 A 0000"
+              className="w-full border-b border-line bg-transparent py-4 font-display text-3xl tracking-tight text-white outline-none placeholder:text-[#3A3A3A] focus:border-accent"
+            />
+            {suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-3">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setPlate(s)}
+                    className="border border-line px-3 py-2 font-display text-sm tracking-tight text-muted"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <label className="mt-6 block text-xs uppercase tracking-widest text-muted" htmlFor="name">
+              Driver name (optional)
+            </label>
+            <div className="flex items-center gap-3 border-b border-line py-3">
+              <User size={16} className="text-muted" />
               <input
-                type="datetime-local"
-                value={manual}
-                onChange={(e) => setManual(e.target.value)}
-                className="bg-transparent text-sm text-white outline-none [color-scheme:dark]"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Driver name"
+                className="flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#3A3A3A]"
+              />
+            </div>
+
+            <label className="mt-6 block text-xs uppercase tracking-widest text-muted" htmlFor="phone">
+              Driver phone (optional)
+            </label>
+            <div className="flex items-center gap-3 border-b border-line py-3">
+              <Phone size={16} className="text-muted" />
+              <input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="98456 54455"
+                className="flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#3A3A3A]"
+              />
+            </div>
+
+            <label className="mt-6 block text-xs uppercase tracking-widest text-muted">
+              Location (optional)
+            </label>
+            <div className="flex items-center gap-3 border-b border-line py-3">
+              <MapPin size={16} className="text-muted" />
+              <input
+                value={locName}
+                onChange={(e) => setLocName(e.target.value)}
+                placeholder="Address or site name"
+                className="flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#3A3A3A]"
               />
               <button
                 type="button"
-                onClick={() => setManual(null)}
+                onClick={gps}
+                disabled={locating}
                 className="text-xs uppercase tracking-widest text-accent"
               >
-                Auto
+                {locating ? '...' : 'GPS'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapOpen(true)}
+                className="flex items-center gap-1 text-xs uppercase tracking-widest text-accent"
+              >
+                <MapIcon size={14} strokeWidth={1.5} /> Map
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setManual(`${today}T${localTimeStr(now)}`)}
-              className="flex items-center gap-2 text-sm text-white"
-            >
-              Auto · {localTimeStr(now)} <Clock size={14} strokeWidth={1.5} className="text-muted" />
-            </button>
-          )}
-        </div>
+            {lat !== null && lng !== null && (
+              <p className="mt-1 text-xs text-muted">
+                Coords: {lat.toFixed(5)}, {lng.toFixed(5)}
+              </p>
+            )}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="mt-8 flex w-full items-center justify-between bg-white px-5 py-4 font-display text-sm font-semibold uppercase tracking-widest text-black active:bg-accent disabled:opacity-50"
-        >
-          {saving ? 'Saving' : 'Add load'}
-          <ArrowUpRight size={16} strokeWidth={1.5} />
-        </button>
-        {flash && <p className="mt-3 text-sm text-accent">{flash}</p>}
-      </form>
-
-      <section className="pb-4 pt-10 md:col-start-2 md:pt-10">
-        <h2 className="text-xs uppercase tracking-widest text-muted">Recent</h2>
-        <ul className="mt-2">
-          {trips.slice(0, 8).map((t) => (
-            <li key={t.id} className="flex items-center justify-between border-b border-line py-3">
-              <div className="flex items-center gap-3">
-                {t.image_url && <img src={t.image_url} alt="" className="h-10 w-10 object-cover" />}
-                <span className="font-display text-lg tracking-tight">{t.plate_number}</span>
-              </div>
-              <span className="flex items-center gap-4 text-sm text-muted">
-                {t.driver_name && <span>{t.driver_name}</span>}
-                {fmtTime(t.trip_time)}
-                <button onClick={() => setEditing(t)} className="hover:text-accent">
-                  <Pencil size={14} strokeWidth={1.5} />
+            <label className="mt-6 block text-xs uppercase tracking-widest text-muted">
+              Photo (optional)
+            </label>
+            <div className="flex items-center gap-3 border-b border-line py-3">
+              <label className="flex cursor-pointer items-center gap-2 border border-line px-3 py-2 text-xs uppercase tracking-widest text-muted">
+                <Camera size={14} strokeWidth={1.5} /> Camera
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={pickImage}
+                  className="hidden"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 border border-line px-3 py-2 text-xs uppercase tracking-widest text-muted">
+                <ImageIcon size={14} strokeWidth={1.5} /> Upload
+                <input type="file" accept="image/*" onChange={pickImage} className="hidden" />
+              </label>
+              {imagePreview && <img src={imagePreview} alt="" className="h-12 w-12 object-cover" />}
+              {imageFile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageFile(null)
+                    setImagePreview(null)
+                  }}
+                  className="text-accent"
+                >
+                  <X size={16} strokeWidth={1.5} />
                 </button>
-              </span>
-            </li>
-          ))}
-          {trips.length === 0 && <li className="py-6 text-sm text-muted">No loads yet today.</li>}
-        </ul>
-      </section>
+              )}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between border-b border-line py-4">
+              <span className="text-sm text-muted">Time</span>
+              {manual ? (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="datetime-local"
+                    value={manual}
+                    onChange={(e) => setManual(e.target.value)}
+                    className="bg-transparent text-sm text-white outline-none [color-scheme:dark]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setManual(null)}
+                    className="text-xs uppercase tracking-widest text-accent"
+                  >
+                    Auto
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setManual(`${today}T${localTimeStr(now)}`)}
+                  className="flex items-center gap-2 text-sm text-white"
+                >
+                  Auto · {localTimeStr(now)} <Clock size={14} strokeWidth={1.5} className="text-muted" />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="mt-8 flex w-full items-center justify-between bg-white px-5 py-4 font-display text-sm font-semibold uppercase tracking-widest text-black active:bg-accent disabled:opacity-50"
+            >
+              {saving ? 'Saving' : 'Add load'}
+              <ArrowUpRight size={16} strokeWidth={1.5} />
+            </button>
+            {flash && <p className="mt-3 text-sm text-accent">{flash}</p>}
+          </form>
+
+          <section className="pb-4 pt-10 md:col-start-2 md:pt-10">
+            <h2 className="text-xs uppercase tracking-widest text-muted">Recent</h2>
+            <ul className="mt-2">{recentList(5)}</ul>
+            {trips.length > 5 && (
+              <button
+                onClick={() => setView('recent')}
+                className="mt-3 flex w-full items-center justify-between py-2 text-xs uppercase tracking-widest text-accent"
+              >
+                View all {trips.length}
+                <ArrowRight size={14} strokeWidth={1.5} />
+              </button>
+            )}
+            {trips.length === 0 && <p className="py-6 text-sm text-muted">No loads yet today.</p>}
+          </section>
+        </div>
+      ) : (
+        <div className="slide-in px-6 pt-8 md:px-0 md:pt-0">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setView('main')}
+              className="flex items-center gap-2 text-xs uppercase tracking-widest text-accent"
+            >
+              <ArrowLeft size={14} strokeWidth={1.5} /> Back
+            </button>
+            <span className="text-xs uppercase tracking-widest text-muted">{fmtDate(today)}</span>
+          </div>
+          <h1 className="mt-4 font-display text-2xl font-semibold tracking-tight">Recent loads</h1>
+          <ul className="mt-4">{recentList()}</ul>
+        </div>
+      )}
 
       {mapOpen && (
         <MapPicker
@@ -432,6 +472,6 @@ export default function Today() {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
