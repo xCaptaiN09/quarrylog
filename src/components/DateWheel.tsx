@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 
 interface Props {
@@ -10,6 +10,64 @@ interface Props {
 export default function DateWheel({ dates, selected, onSelect }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false })
+  const raf = useRef<number | null>(null)
+  const settleTimer = useRef<number | undefined>(undefined)
+  const [half, setHalf] = useState(0)
+
+  const items: { id: string | 'all'; label: string; sub: string }[] = [
+    { id: 'all', label: 'All', sub: 'dates' },
+    ...dates.map((d) => {
+      const dt = new Date(`${d}T00:00:00`)
+      return {
+        id: d,
+        label: String(dt.getDate()),
+        sub: dt.toLocaleDateString('en-GB', { weekday: 'short', month: 'short' }),
+      }
+    }),
+  ]
+
+  const centerItem = (id: string, smooth: boolean) => {
+    const el = ref.current
+    if (!el) return
+    const t = el.querySelector<HTMLElement>(`[data-id="${id}"]`)
+    if (!t) return
+    el.scrollTo({
+      left: t.offsetLeft + t.clientWidth / 2 - el.clientWidth / 2,
+      behavior: smooth ? 'smooth' : 'auto',
+    })
+  }
+
+  const pickCenter = (settle: boolean) => {
+    const el = ref.current
+    if (!el) return
+    const center = el.scrollLeft + el.clientWidth / 2
+    let best: string | null = null
+    let bestD = Infinity
+    el.querySelectorAll<HTMLElement>('[data-id]').forEach((c) => {
+      const d = Math.abs(c.offsetLeft + c.clientWidth / 2 - center)
+      if (d < bestD) {
+        bestD = d
+        best = c.dataset.id ?? null
+      }
+    })
+    if (!best) return
+    if (best !== selected) onSelect(best)
+    if (settle) centerItem(best, true)
+  }
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => setHalf(el.clientWidth / 2)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  useEffect(() => {
+    if (half > 0) centerItem(selected, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [half, dates.length])
 
   useEffect(() => {
     const el = ref.current
@@ -22,17 +80,12 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const target = el.querySelector<HTMLElement>(`[data-id="${selected}"]`)
-    if (!target) return
-    el.scrollTo({
-      left: target.offsetLeft - el.clientWidth / 2 + target.clientWidth / 2,
-      behavior: 'auto',
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dates.length])
+  const onScroll = () => {
+    if (raf.current) cancelAnimationFrame(raf.current)
+    raf.current = requestAnimationFrame(() => pickCenter(false))
+    window.clearTimeout(settleTimer.current)
+    settleTimer.current = window.setTimeout(() => pickCenter(true), 160)
+  }
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse' || !ref.current) return
@@ -58,59 +111,50 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
     }
   }
 
-  const pick = (id: string) => {
-    onSelect(id)
-    const el = ref.current
-    if (!el) return
-    const target = el.querySelector<HTMLElement>(`[data-id="${id}"]`)
-    if (!target) return
-    el.scrollTo({
-      left: target.offsetLeft - el.clientWidth / 2 + target.clientWidth / 2,
-      behavior: 'smooth',
-    })
-  }
-
-  const items: { id: string | 'all'; label: string; sub: string }[] = [
-    { id: 'all', label: 'All', sub: 'dates' },
-    ...dates.map((d) => {
-      const dt = new Date(`${d}T00:00:00`)
-      return {
-        id: d,
-        label: String(dt.getDate()),
-        sub: dt.toLocaleDateString('en-GB', { weekday: 'short', month: 'short' }),
-      }
-    }),
-  ]
-
   return (
-    <div
-      ref={ref}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onClickCapture={onClickCapture}
-      className="no-scrollbar flex cursor-grab select-none gap-3 overflow-x-auto overscroll-x-contain px-6 py-2 active:cursor-grabbing"
-    >
-      {items.map((it) => {
-        const active = selected === it.id
-        return (
-          <button
-            key={it.id}
-            data-id={it.id}
-            onClick={() => pick(it.id)}
-            className="flex flex-col items-center gap-1 px-2"
-          >
-            <span className={`w-px transition-all ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
-            <span className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}>
-              {it.label}
-            </span>
-            <span className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}>
-              {it.sub}
-            </span>
-          </button>
-        )
-      })}
+    <div className="relative">
+      <span className="pointer-events-none absolute left-1/2 top-0 z-10 h-2 w-px -translate-x-1/2 bg-accent" />
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={onClickCapture}
+        className="no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-2 active:cursor-grabbing"
+        style={{
+          maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
+          WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
+        }}
+      >
+        <div style={{ width: half }} className="shrink-0" />
+        {items.map((it) => {
+          const active = selected === it.id
+          return (
+            <button
+              key={it.id}
+              data-id={it.id}
+              onClick={() => {
+                onSelect(it.id)
+                centerItem(it.id, true)
+              }}
+              className={`flex shrink-0 flex-col items-center gap-1 transition-transform duration-150 ${
+                active ? 'scale-125' : 'scale-100'
+              }`}
+            >
+              <span className={`w-px ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />
+              <span className={`font-display text-xl tracking-tight ${active ? 'text-white' : 'text-muted'}`}>
+                {it.label}
+              </span>
+              <span className={`text-[10px] uppercase tracking-widest ${active ? 'text-accent' : 'text-muted'}`}>
+                {it.sub}
+              </span>
+            </button>
+          )
+        })}
+        <div style={{ width: half }} className="shrink-0" />
+      </div>
     </div>
   )
 }
