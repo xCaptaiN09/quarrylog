@@ -9,7 +9,10 @@ interface Props {
 
 export default function DateWheel({ dates, selected, onSelect }: Props) {
   const onSelectRef = useRef(onSelect)
+  const selectedRef = useRef(selected)
   onSelectRef.current = onSelect
+  selectedRef.current = selected
+  const positioned = useRef(false)
 
   const items: { id: string | 'all'; label: string; sub: string }[] = [
     { id: 'all', label: 'All', sub: 'dates' },
@@ -27,23 +30,43 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
 
   useEffect(() => {
     if (!emblaApi) return
-    const handle = () => {
-      const id = items[emblaApi.selectedScrollSnap()]?.id
-      if (id) onSelectRef.current(id)
+    let raf = 0
+
+    const pickFromDom = () => {
+      const root = emblaApi.rootNode()
+      const center = root.getBoundingClientRect().left + root.clientWidth / 2
+      let best: string | null = null
+      let bestD = Infinity
+      root.querySelectorAll('[data-id]').forEach((n) => {
+        const r = (n as HTMLElement).getBoundingClientRect()
+        const d = Math.abs(r.left + r.width / 2 - center)
+        if (d < bestD) {
+          bestD = d
+          best = (n as HTMLElement).dataset.id ?? null
+        }
+      })
+      if (best && best !== selectedRef.current) onSelectRef.current(best)
     }
-    emblaApi.on('select', handle)
+
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(pickFromDom)
+    }
+
+    emblaApi.on('scroll', onScroll)
+
+    if (!positioned.current && items.length > 1) {
+      const idx = items.findIndex((i) => i.id === selectedRef.current)
+      if (idx >= 0) emblaApi.scrollTo(idx)
+      positioned.current = true
+    }
+
     return () => {
-      emblaApi.off('select', handle)
+      cancelAnimationFrame(raf)
+      emblaApi.off('scroll', onScroll)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emblaApi, dates.length])
-
-  useEffect(() => {
-    if (!emblaApi) return
-    const idx = items.findIndex((i) => i.id === selected)
-    if (idx >= 0 && idx !== emblaApi.selectedScrollSnap()) emblaApi.scrollTo(idx)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emblaApi, selected])
 
   useEffect(() => {
     if (!emblaApi) return
@@ -74,6 +97,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
             return (
               <button
                 key={it.id}
+                data-id={it.id}
                 onClick={() => {
                   onSelect(it.id)
                   emblaApi?.scrollTo(items.findIndex((x) => x.id === it.id))
