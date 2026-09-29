@@ -7,6 +7,7 @@ import { fmtDate, fmtTime, localDateStr, localTimeStr } from '../lib/time'
 
 export default function Today() {
   const [trips, setTrips] = useState<Trip[]>([])
+  const [known, setKnown] = useState<string[]>([])
   const [plate, setPlate] = useState('')
   const [manual, setManual] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -27,8 +28,27 @@ export default function Today() {
 
   useEffect(() => {
     load()
+    const channel = supabase
+      .channel('trips-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
+        load()
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today])
+
+  useEffect(() => {
+    supabase
+      .from('trips')
+      .select('plate_number')
+      .limit(1000)
+      .then(({ data }) => {
+        if (data) setKnown([...new Set(data.map((d) => d.plate_number))].sort())
+      })
+  }, [])
 
   const counts = useMemo(() => {
     const m = new Map<string, number>()
@@ -41,6 +61,12 @@ export default function Today() {
     for (const [p, c] of counts) if (!best || c > best[1]) best = [p, c]
     return best
   }, [counts])
+
+  const suggestions = useMemo(() => {
+    const q = plate.trim()
+    if (!q) return []
+    return known.filter((p) => p.startsWith(q) && p !== q).slice(0, 4)
+  }, [known, plate])
 
   const add = async (e: FormEvent) => {
     e.preventDefault()
@@ -57,6 +83,7 @@ export default function Today() {
       setFlash(`Load ${(counts.get(value) ?? 0) + 1} for ${value}`)
       setPlate('')
       setManual(null)
+      setKnown((prev) => (prev.includes(value) ? prev : [...prev, value].sort()))
       await load()
     } else {
       setFlash('Failed to save load.')
@@ -98,23 +125,23 @@ export default function Today() {
       </section>
 
       <section className="mt-6 grid grid-cols-2 gap-0.5 md:col-span-2 md:grid-cols-4">
-        <div className="flex aspect-square flex-col justify-between bg-accent p-4 text-black">
+        <div className="flex aspect-square flex-col justify-between bg-accent p-4 text-black md:aspect-auto md:h-64">
           <span className="text-sm">Lorries</span>
           <div>
             <p className="font-display text-4xl font-semibold tracking-tighter">{counts.size}</p>
             <Truck className="mt-3" size={22} strokeWidth={1.5} />
           </div>
         </div>
-        <div className="flex aspect-square flex-col justify-between bg-tile p-4">
+        <div className="flex aspect-square flex-col justify-between bg-tile p-4 md:aspect-auto md:h-64">
           <span className="text-sm text-muted">Top lorry</span>
           <div>
-            <p className="truncate font-display text-2xl font-semibold tracking-tight">
+            <p className="truncate font-display text-xl font-semibold tracking-tight md:text-2xl">
               {top ? top[0] : '—'}
             </p>
             <Award className="mt-3 text-white" size={22} strokeWidth={1.5} />
           </div>
         </div>
-        <div className="flex aspect-square flex-col justify-between bg-tile p-4">
+        <div className="flex aspect-square flex-col justify-between bg-tile p-4 md:aspect-auto md:h-64">
           <span className="text-sm text-muted">Last load</span>
           <div>
             <p className="font-display text-2xl font-semibold tracking-tight">
@@ -126,7 +153,7 @@ export default function Today() {
         </div>
         <button
           onClick={() => inputRef.current?.focus()}
-          className="flex aspect-square flex-col justify-between bg-accent p-4 text-left text-black"
+          className="flex aspect-square flex-col justify-between bg-accent p-4 text-left text-black md:aspect-auto md:h-64"
         >
           <span className="text-sm">Quick add</span>
           <Plus size={22} strokeWidth={1.5} />
@@ -145,6 +172,20 @@ export default function Today() {
           placeholder="KL 00 A 0000"
           className="w-full border-b border-line bg-transparent py-4 font-display text-3xl tracking-tight text-white outline-none placeholder:text-[#3A3A3A] focus:border-accent"
         />
+        {suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-3">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setPlate(s)}
+                className="border border-line px-3 py-2 font-display text-sm tracking-tight text-muted"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center justify-between border-b border-line py-4">
           <span className="text-sm text-muted">Time</span>
           {manual ? (
