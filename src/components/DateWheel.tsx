@@ -27,7 +27,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   const items: { id: string | 'all'; label: string; sub: string }[] = [
     { id: 'all', label: 'All', sub: 'dates' },
     ...dates.map((d) => {
-      const dt = new Date(`${d}T00:00:00)`.replace(')', ''))
+      const dt = new Date(`${d}T00:00:00`)
       return {
         id: d,
         label: String(dt.getDate()),
