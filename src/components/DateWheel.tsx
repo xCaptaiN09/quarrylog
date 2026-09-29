@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 
 interface Props {
@@ -25,7 +25,6 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   const onSelectRef = useRef(onSelect)
   selectedRef.current = selected
   onSelectRef.current = onSelect
-  const [half, setHalf] = useState(0)
 
   const items: { id: string | 'all'; label: string; sub: string }[] = [
     { id: 'all', label: 'All', sub: 'dates' },
@@ -74,22 +73,13 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
   }
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const update = () => setHalf(el.clientWidth / 2)
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [])
-
-  useEffect(() => {
-    if (half > 0) {
-      centerItem(selected, false)
-      const t = window.setTimeout(() => centerItem(selected, false), 250)
+    if (dates.length > 0) {
+      centerItem(selectedRef.current, false)
+      const t = window.setTimeout(() => centerItem(selectedRef.current, false), 250)
       return () => window.clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [half, dates.length])
+  }, [dates.length])
 
   useEffect(() => {
     const el = ref.current
@@ -187,7 +177,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
         onClickCapture={onClickCapture}
         className="wheel-mask no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 [touch-action:pan-x] active:cursor-grabbing"
       >
-        <div style={{ width: half }} className="shrink-0" />
+        <div className="w-[45%] shrink-0" />
         {items.map((it) => {
           const active = selected === it.id
           return (
@@ -212,7 +202,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
             </button>
           )
         })}
-        <div style={{ width: half }} className="shrink-0" />
+        <div className="w-[45%] shrink-0" />
       </div>
     </div>
   )
