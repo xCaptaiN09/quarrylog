@@ -9,7 +9,14 @@ interface Props {
 
 export default function DateWheel({ dates, selected, onSelect }: Props) {
   const ref = useRef<HTMLDivElement>(null)
-  const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false })
+  const drag = useRef({
+    down: false,
+    pointerId: -1,
+    startX: 0,
+    startScroll: 0,
+    moved: false,
+    captured: false,
+  })
   const raf = useRef<number | null>(null)
   const settleTimer = useRef<number | undefined>(undefined)
   const [half, setHalf] = useState(0)
@@ -89,18 +96,35 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse' || !ref.current) return
-    drag.current = { down: true, startX: e.clientX, startScroll: ref.current.scrollLeft, moved: false }
+    drag.current = {
+      down: true,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startScroll: ref.current.scrollLeft,
+      moved: false,
+      captured: false,
+    }
   }
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!drag.current.down || !ref.current) return
     const dx = e.clientX - drag.current.startX
-    if (Math.abs(dx) > 5) drag.current.moved = true
-    ref.current.scrollLeft = drag.current.startScroll - dx
+    if (!drag.current.captured && Math.abs(dx) > 5) {
+      drag.current.captured = true
+      drag.current.moved = true
+      ref.current.setPointerCapture(drag.current.pointerId)
+    }
+    if (drag.current.captured) {
+      ref.current.scrollLeft = drag.current.startScroll - dx
+    }
   }
 
-  const endDrag = () => {
+  const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (drag.current.captured && ref.current?.hasPointerCapture(e.pointerId)) {
+      ref.current.releasePointerCapture(e.pointerId)
+    }
     drag.current.down = false
+    drag.current.captured = false
   }
 
   const onClickCapture = (e: ReactMouseEvent) => {
@@ -122,7 +146,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
-        className="no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-2 active:cursor-grabbing"
+        className="no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 active:cursor-grabbing"
         style={{
           maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
           WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',

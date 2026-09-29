@@ -72,7 +72,7 @@ export default function History() {
         </button>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 md:max-w-md">
         <DateWheel dates={dates} selected={active} onSelect={setSelected} />
       </div>
 
