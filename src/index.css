@@ -3,15 +3,26 @@
 @theme {
   --color-bg: #0A0A0A;
   --color-tile: #262626;
+  --color-line: #2E2E2E;
   --color-accent: #FF6B00;
+  --color-muted: #8A8A8A;
   --font-display: "Inter Tight", sans-serif;
   --font-body: "Inter", sans-serif;
 }
 
+html {
+  background: #050505;
+}
+
 body {
-  background-color: var(--color-bg);
-  color: white;
-  font-family: var(--font-body);
   margin: 0;
+  background: var(--color-bg);
+  color: #fff;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #000;
 }
