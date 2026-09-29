@@ -186,11 +186,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
         onScroll={onScroll}
         onPointerDown={onPointerDown}
         onClickCapture={onClickCapture}
-        className="no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 [touch-action:pan-x] active:cursor-grabbing"
-        style={{
-          maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
-          WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
-        }}
+        className="wheel-mask no-scrollbar flex cursor-grab select-none items-start gap-6 overflow-x-auto overscroll-x-contain py-4 [touch-action:pan-x] active:cursor-grabbing"
       >
         <div style={{ width: half }} className="shrink-0" />
         {items.map((it) => {
@@ -204,7 +200,7 @@ export default function DateWheel({ dates, selected, onSelect }: Props) {
                 centerItem(it.id, true)
               }}
               className={`flex shrink-0 flex-col items-center gap-1 transition-transform duration-150 ${
-                active ? 'scale-125' : 'scale-100'
+                active ? 'scale-125 md:scale-100' : 'scale-100'
               }`}
             >
               <span className={`w-px ${active ? 'h-8 bg-accent' : 'h-4 bg-line'}`} />

@@ -58,3 +58,15 @@ body {
 .slide-in {
   animation: slide-in 0.25s ease;
 }
+
+.wheel-mask {
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
+@media (min-width: 768px) {
+  .wheel-mask {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+}
