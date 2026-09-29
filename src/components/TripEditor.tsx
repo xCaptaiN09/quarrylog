@@ -16,6 +16,7 @@ interface Props {
 
 export default function TripEditor({ trip, onClose, onSaved, onDelete }: Props) {
   const [plate, setPlate] = useState(trip.plate_number)
+  const [name, setName] = useState(trip.driver_name ?? '')
   const [phone, setPhone] = useState(trip.driver_phone ?? '')
   const [dt, setDt] = useState(`${trip.trip_date}T${fmtTime(trip.trip_time)}`)
   const [locName, setLocName] = useState(trip.location_name ?? '')
@@ -38,8 +39,8 @@ export default function TripEditor({ trip, onClose, onSaved, onDelete }: Props) 
       async (p) => {
         setLat(p.coords.latitude)
         setLng(p.coords.longitude)
-        const name = await reverseGeocode(p.coords.latitude, p.coords.longitude)
-        if (name) setLocName(name)
+        const name2 = await reverseGeocode(p.coords.latitude, p.coords.longitude)
+        if (name2) setLocName(name2)
         setLocating(false)
       },
       () => {
@@ -70,6 +71,7 @@ export default function TripEditor({ trip, onClose, onSaved, onDelete }: Props) 
       .from('trips')
       .update({
         plate_number: value,
+        driver_name: name.trim() || null,
         driver_phone: phone.trim() || null,
         trip_date: localDateStr(when),
         trip_time: localTimeStr(when),
@@ -110,6 +112,14 @@ export default function TripEditor({ trip, onClose, onSaved, onDelete }: Props) 
           value={plate}
           onChange={(e) => setPlate(e.target.value.toUpperCase())}
           className="w-full border-b border-line bg-transparent py-3 font-display text-2xl tracking-tight text-white outline-none focus:border-accent"
+        />
+
+        <label className="mt-5 block text-xs uppercase tracking-widest text-muted">Driver name</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Optional"
+          className="w-full border-b border-line bg-transparent py-3 text-base text-white outline-none placeholder:text-[#3A3A3A] focus:border-accent"
         />
 
         <label className="mt-5 block text-xs uppercase tracking-widest text-muted">Driver phone</label>
@@ -194,9 +204,7 @@ export default function TripEditor({ trip, onClose, onSaved, onDelete }: Props) 
         {flash && <p className="mt-3 text-sm text-accent">{flash}</p>}
 
         <div className="mt-8 border-t border-line pt-5">
-          <label className="block text-xs uppercase tracking-widest text-muted">
-            Delete this load
-          </label>
+          <label className="block text-xs uppercase tracking-widest text-muted">Delete this load</label>
           <div className="mt-2 flex gap-2">
             <input
               value={delText}

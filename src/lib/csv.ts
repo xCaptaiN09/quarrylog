@@ -2,11 +2,12 @@ import type { Trip } from '../types'
 
 export const downloadCsv = (trips: Trip[], filename: string) => {
   const rows = [
-    ['date', 'time', 'plate_number', 'driver_phone', 'location_name', 'lat', 'lng', 'image_url'],
+    ['date', 'time', 'plate_number', 'driver_name', 'driver_phone', 'location_name', 'lat', 'lng', 'image_url'],
     ...trips.map((t) => [
       t.trip_date,
       t.trip_time,
       t.plate_number,
+      t.driver_name ?? '',
       t.driver_phone ?? '',
       t.location_name ?? '',
       t.location_lat?.toString() ?? '',

@@ -4,6 +4,7 @@ export interface Trip {
   trip_date: string
   trip_time: string
   created_at: string
+  driver_name: string | null
   driver_phone: string | null
   location_lat: number | null
   location_lng: number | null

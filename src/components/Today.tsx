@@ -12,6 +12,7 @@ import {
   Phone,
   Plus,
   Truck,
+  User,
   X,
 } from 'lucide-react'
 import { supabase } from '../supabase'
@@ -25,6 +26,7 @@ export default function Today() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [known, setKnown] = useState<string[]>([])
   const [plate, setPlate] = useState('')
+  const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [locName, setLocName] = useState('')
   const [lat, setLat] = useState<number | null>(null)
@@ -98,8 +100,8 @@ export default function Today() {
       async (p) => {
         setLat(p.coords.latitude)
         setLng(p.coords.longitude)
-        const name = await reverseGeocode(p.coords.latitude, p.coords.longitude)
-        if (name) setLocName(name)
+        const addr = await reverseGeocode(p.coords.latitude, p.coords.longitude)
+        if (addr) setLocName(addr)
         setLocating(false)
       },
       () => {
@@ -117,6 +119,7 @@ export default function Today() {
 
   const resetForm = () => {
     setPlate('')
+    setName('')
     setPhone('')
     setLocName('')
     setLat(null)
@@ -144,6 +147,7 @@ export default function Today() {
       plate_number: value,
       trip_date: localDateStr(when),
       trip_time: localTimeStr(when),
+      driver_name: name.trim() || null,
       driver_phone: phone.trim() || null,
       location_lat: lat,
       location_lng: lng,
@@ -250,6 +254,20 @@ export default function Today() {
             ))}
           </div>
         )}
+
+        <label className="mt-6 block text-xs uppercase tracking-widest text-muted" htmlFor="name">
+          Driver name (optional)
+        </label>
+        <div className="flex items-center gap-3 border-b border-line py-3">
+          <User size={16} className="text-muted" />
+          <input
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Driver name"
+            className="flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#3A3A3A]"
+          />
+        </div>
 
         <label className="mt-6 block text-xs uppercase tracking-widest text-muted" htmlFor="phone">
           Driver phone (optional)
@@ -376,6 +394,7 @@ export default function Today() {
                 <span className="font-display text-lg tracking-tight">{t.plate_number}</span>
               </div>
               <span className="flex items-center gap-4 text-sm text-muted">
+                {t.driver_name && <span>{t.driver_name}</span>}
                 {fmtTime(t.trip_time)}
                 <button onClick={() => setEditing(t)} className="hover:text-accent">
                   <Pencil size={14} strokeWidth={1.5} />
